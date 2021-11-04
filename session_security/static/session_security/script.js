@@ -36,13 +36,15 @@ yourlabs.SessionSecurity = function (options) {
 
   // Merge the options dict here.
   Object.assign(this, options);
-  console.log(options);
-  // Bind activity events to update this.lastActivity.
-  var m_document = document.querySelector(document);
+  
 
-  for (var i = 0; i < this.events.length; i++) {
-    if (m_document[this.events[i]]) {
-      m_document[this.events[i]](this.activity.bind(this));
+  // Bind activity events to update this.lastActivity.
+  var m_document = document;
+  
+  
+  for (var i = 0; i < this.events.length; i++) {        
+    if (m_document[this.events[i]] == null) {      
+      m_document.addEventListener(this.events[i], this.activity.bind(this));      
     }
   }
 
@@ -51,16 +53,16 @@ yourlabs.SessionSecurity = function (options) {
 
   if (this.confirmFormDiscard) {
     window.onbeforeunload = this.onbeforeunload.bind(this);
-    m_document.addEventListener("change", "input", this.formChange.bind(this));
-    m_document.addEventListener("submit", "form", this.formClean.bind(this));
-    m_document.addEventListener("reset", "form", this.formClean.bind(this));
+    m_document.addEventListener("change", this.formChange.bind(this));
+    m_document.addEventListener("submit", this.formClean.bind(this));
+    m_document.addEventListener("reset", this.formClean.bind(this));
   }
 };
 
 yourlabs.SessionSecurity.prototype = {
   // Called when there has been no activity for more than expireAfter
   // seconds.
-  expire: function () {
+  expire: function () {    
     this.expired = true;
     if (this.returnToUrl !== undefined) {
       window.location.href = this.returnToUrl;
@@ -72,9 +74,8 @@ yourlabs.SessionSecurity.prototype = {
   // Called when there has been no activity for more than warnAfter
   // seconds.
   showWarning: function () {
-    // TODO: Fix this for non jquery stuff.
+    
     this.warning.removeAttribute("style", "");
-    console.log("hiding warning");
     this.warning.setAttribute("aria-hidden", "false");
     document.querySelector(".session_security_modal").focus();
   },
@@ -82,17 +83,16 @@ yourlabs.SessionSecurity.prototype = {
   // Called to hide the warning, for example if there has been activity on
   // the server side - in another browser tab.
   hideWarning: function () {
-    // TODO: Fix this for non jquery stuff.
-    console.log("hiding warning");
+     
     this.warning.setAttribute("style", "display:none");
     this.warning.setAttribute("aria-hidden", "true");
   },
 
   // Called by click, scroll, mousemove, keyup, touchstart, touchend, touchmove
-  activity: function () {
+  activity: function () {    
     var now = new Date();
-    if (now - this.lastActivity < 1000)
-      // Throttle these checks to once per second
+    if (now - this.lastActivity < 1500)
+      // Throttle these checks to once per 1.5 seconds
       return;
 
     var idleFor = Math.floor((now - this.lastActivity) / 1000);
@@ -103,8 +103,7 @@ yourlabs.SessionSecurity.prototype = {
       // ensures a user being redirected instead of waiting until nextPing.
       this.expire();
     }
-
-    if (this.$warning.is(":visible")) {
+    if (!this.warning.hasAttribute('style')) {
       // Inform the server that the user came back manually, this should
       // block other browser tabs from expiring.
       this.ping();
@@ -114,31 +113,45 @@ yourlabs.SessionSecurity.prototype = {
   },
 
   // Hit the PingView with the number of seconds since last activity.
-  ping: function () {
-    var idleFor = Math.floor((new Date() - this.lastActivity) / 1000);
+  ping: function () {    
+    var idleFor = Math.floor((new Date() - this.lastActivity) / 1000);    
+    
+    var xhr = new XMLHttpRequest();
+    
+    // For no cache, append _ with current timestamp.
+    let xUrl = this.pingUrl + "?idleFor=" + String(idleFor) + "&_=" + String(new Date().getTime());
 
-    var request = new XMLHttpRequest();
-    request.open("GET", this.pingUrl, true);
+    xhr.open("GET", xUrl , true);
+    // set header to JSON?
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    var self = this;
+    var ponger = self.pong.bind(self);
+    var applier = self.apply.bind(self);
+    xhr.onload =  function() {
+        if (xhr.readyState == xhr.DONE && xhr.status == 200)
+        {
+         
+          ponger(xhr.response);
+        }
+        else if (xhr.readyState == xhr.DONE && xhr.status == 400)
+        {         
+          applier(xhr.response  );
+        }
+        else
+        {          
+        }            
+    };      
 
-    request.onload = function () {
-      if (this.status >= 200 && this.status < 400) {
-        // Success!
-        this.pong.bind(this);
-      } else {
-        // We reached our target server, but it returned an error
-        this.apply.bind(this);
-      }
-    };
-
-    request.onerror = function () {
-      // There was a connection error of some sort
-    };
-
-    request.send(idleFor);
+    xhr.onerror = function(){
+      console.log("Error connecting to ping view");
+    }    
+    xhr.send(JSON.stringify({
+      idleFor: idleFor,
+  }));
   },
 
   // Callback to process PingView response.
-  pong: function (data) {
+  pong: function (data) {    
     if (data == "logout") return this.expire();
     this.lastActivity = new Date();
     this.lastActivity.setSeconds(this.lastActivity.getSeconds() - data);
@@ -147,11 +160,10 @@ yourlabs.SessionSecurity.prototype = {
 
   // Apply warning or expiry, setup next ping
   apply: function () {
-    // Cancel timeout if any, since we're going to make our own
+    // Cancel timeout if any, since we're going to make our own    
     clearTimeout(this.timeout);
 
-    var idleFor = Math.floor((new Date() - this.lastActivity) / 1000);
-
+    var idleFor = Math.floor((new Date() - this.lastActivity) / 1000);    
     if (idleFor >= this.expireAfter) {
       return this.expire();
     } else if (idleFor >= this.warnAfter) {
@@ -163,8 +175,8 @@ yourlabs.SessionSecurity.prototype = {
     }
 
     // setTimeout expects the timeout value not to exceed
-    // a 32-bit unsigned int, so cap the value
-    var milliseconds = Math.min(nextPing * 1000, 2147483647);
+    // a 32-bit unsigned int, so cap the value    
+    var milliseconds = Math.min(nextPing * 1000, 2147483647);    
     this.timeout = setTimeout(this.ping.bind(this), milliseconds);
   },
 
