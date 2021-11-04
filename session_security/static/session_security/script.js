@@ -18,7 +18,7 @@ if (window.yourlabs == undefined) window.yourlabs = {};
 yourlabs.SessionSecurity = function (options) {
   // **HTML element** that should show to warn the user that his session will
   // expire.
-  this.$warning = document.querySelector("#session_security_warning");
+  this.warning = document.querySelector("#session_security_warning");
 
   // Last recorded activity datetime.
   this.lastActivity = new Date();
@@ -36,12 +36,13 @@ yourlabs.SessionSecurity = function (options) {
 
   // Merge the options dict here.
   Object.assign(this, options);
-
+  console.log(options);
   // Bind activity events to update this.lastActivity.
-  var $document = document.querySelector(document);
+  var m_document = document.querySelector(document);
+
   for (var i = 0; i < this.events.length; i++) {
-    if ($document[this.events[i]]) {
-      $document[this.events[i]](this.activity.bind(this));
+    if (m_document[this.events[i]]) {
+      m_document[this.events[i]](this.activity.bind(this));
     }
   }
 
@@ -50,9 +51,9 @@ yourlabs.SessionSecurity = function (options) {
 
   if (this.confirmFormDiscard) {
     window.onbeforeunload = this.onbeforeunload.bind(this);
-    $document.addEventListener("change", ":input", this.formChange.bind(this));
-    $document.addEventListener("submit", "form", this.formClean.bind(this));
-    $document.addEventListener("reset", "form", this.formClean.bind(this));
+    m_document.addEventListener("change", "input", this.formChange.bind(this));
+    m_document.addEventListener("submit", "form", this.formClean.bind(this));
+    m_document.addEventListener("reset", "form", this.formClean.bind(this));
   }
 };
 
@@ -71,16 +72,20 @@ yourlabs.SessionSecurity.prototype = {
   // Called when there has been no activity for more than warnAfter
   // seconds.
   showWarning: function () {
-    this.$warning.fadeIn("slow");
-    this.$warning.attr("aria-hidden", "false");
+    // TODO: Fix this for non jquery stuff.
+    this.warning.removeAttribute("style", "");
+    console.log("hiding warning");
+    this.warning.setAttribute("aria-hidden", "false");
     document.querySelector(".session_security_modal").focus();
   },
 
   // Called to hide the warning, for example if there has been activity on
   // the server side - in another browser tab.
   hideWarning: function () {
-    this.$warning.hide();
-    this.$warning.attr("aria-hidden", "true");
+    // TODO: Fix this for non jquery stuff.
+    console.log("hiding warning");
+    this.warning.setAttribute("style", "display:none");
+    this.warning.setAttribute("aria-hidden", "true");
   },
 
   // Called by click, scroll, mousemove, keyup, touchstart, touchend, touchmove
