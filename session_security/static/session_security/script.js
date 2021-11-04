@@ -151,8 +151,8 @@ yourlabs.SessionSecurity.prototype = {
   },
 
   // Callback to process PingView response.
-  pong: function (data) {    
-    if (data == "logout") return this.expire();
+  pong: function (data) {     
+    if (String(data) == "\"logout\"") return this.expire();
     this.lastActivity = new Date();
     this.lastActivity.setSeconds(this.lastActivity.getSeconds() - data);
     this.apply();
